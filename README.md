@@ -1,10 +1,10 @@
-# Runware Clone - AI Image & Video Generation Platform
+# AIEasyEasy2 - Runware Clone
 
 A Next.js application that replicates Runware's functionality with AI image generation, GitHub integration, and Vercel deployment capabilities.
 
 ## 🚀 Features
 
-- **AI Image Generation**: Generate high-quality images using Runware's API
+- **AI Image Generation**: Generate high-quality images using Runware's API with FLUX.1 model
 - **GitHub Integration**: Connect repositories and manage deployments  
 - **Responsive Design**: Modern UI with Tailwind CSS and Framer Motion
 - **Real-time Generation**: Interactive playground for testing AI models
@@ -25,8 +25,8 @@ A Next.js application that replicates Runware's functionality with AI image gene
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
-   cd runware-clone
+   git clone https://github.com/JohnBravo17/aieasyeasy2.git
+   cd aieasyeasy2
    ```
 
 2. **Install dependencies**
