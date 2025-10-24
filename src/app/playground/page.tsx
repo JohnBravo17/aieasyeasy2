@@ -19,9 +19,9 @@ export default function PlaygroundPage() {
   const [settings, setSettings] = useState({
     width: 1024,
     height: 1024,
-    steps: 25,
-    cfgScale: 7.0,
-    model: 'runware:100@1',
+    steps: 20,
+    cfgScale: 3.5,
+    model: 'runware:101@1',
   });
 
   const handleGenerate = async () => {

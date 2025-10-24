@@ -13,17 +13,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Runware API
-    const runware = new RunwareAPI();
-    
-    // Validate API key
-    const isValidKey = await runware.validateApiKey();
-    if (!isValidKey) {
+    // Check if API key is configured
+    const apiKey = process.env.RUNWARE_API_KEY;
+    if (!apiKey || apiKey === 'your_runware_api_key_here') {
       return NextResponse.json(
-        { error: 'Invalid or missing Runware API key' },
-        { status: 401 }
+        { 
+          error: 'Runware API key not configured. Please set RUNWARE_API_KEY in your environment variables.',
+          details: 'Check your .env.local file and ensure the API key is properly set.'
+        },
+        { status: 500 }
       );
     }
+
+    // Initialize Runware API
+    const runware = new RunwareAPI();
 
     // Prepare request parameters
     const params: ImageGenerationRequest = {
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
       negativePrompt: body.negativePrompt,
       height: body.height || 1024,
       width: body.width || 1024,
-      model: body.model || 'runware:100@1',
+      model: body.model || 'civitai:4384@9942',
       steps: body.steps || 25,
       CFGScale: body.CFGScale || 7.0,
       seed: body.seed,
@@ -46,9 +49,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Image generation error:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to generate image';
+    let statusCode = 500;
+    
+    if (error.message?.includes('API key')) {
+      errorMessage = 'Invalid or missing Runware API key. Please check your API key configuration.';
+      statusCode = 401;
+    } else if (error.message?.includes('Network Error') || error.message?.includes('timeout')) {
+      errorMessage = 'Network error connecting to Runware API. Please try again.';
+      statusCode = 503;
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Authentication failed. Please verify your Runware API key.';
+      statusCode = 401;
+    } else if (error.response?.status === 429) {
+      errorMessage = 'Rate limit exceeded. Please try again later.';
+      statusCode = 429;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Failed to generate image' },
-      { status: 500 }
+      { 
+        error: errorMessage,
+        details: error.response?.data || error.message || 'Unknown error occurred'
+      },
+      { status: statusCode }
     );
   }
 }

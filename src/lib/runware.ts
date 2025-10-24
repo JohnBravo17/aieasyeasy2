@@ -48,7 +48,7 @@ export class RunwareAPI {
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.RUNWARE_API_KEY || '';
-    this.baseURL = process.env.RUNWARE_API_URL || 'https://api.runware.ai/v1';
+    this.baseURL = 'https://api.runware.ai/v1';
     
     this.axiosInstance = axios.create({
       baseURL: this.baseURL,
@@ -63,30 +63,47 @@ export class RunwareAPI {
   // Generate images using Runware API
   async generateImage(params: ImageGenerationRequest): Promise<RunwareResponse> {
     try {
-      const requestData = {
+      const taskUUID = params.taskUUID || this.generateUUID();
+      
+      // Runware API expects an array of tasks
+      const requestData = [{
         taskType: 'imageInference',
-        taskUUID: params.taskUUID || this.generateUUID(),
+        taskUUID: taskUUID,
         positivePrompt: params.positivePrompt,
-        negativePrompt: params.negativePrompt || '',
         height: params.height || 1024,
         width: params.width || 1024,
-        model: params.model || 'runware:100@1',
-        steps: params.steps || 25,
-        CFGScale: params.CFGScale || 7.0,
+        model: params.model || 'runware:101@1',  // FLUX.1 Dev model
+        steps: params.steps || 20,
+        CFGScale: params.CFGScale || 3.5, // FLUX models work better with lower CFG
         seed: params.seed,
         numberResults: params.numberResults || 1,
-        outputFormat: params.outputFormat || 'PNG',
-      };
+        outputFormat: params.outputFormat || 'JPG',
+        outputType: 'URL',
+        deliveryMethod: 'sync',
+        ...(params.negativePrompt && { negativePrompt: params.negativePrompt })
+      }];
 
-      const response = await this.axiosInstance.post('/inference', requestData);
+      console.log('Sending request to Runware API:', JSON.stringify(requestData, null, 2));
+
+      const response = await this.axiosInstance.post('', requestData);
       
-      return {
-        taskUUID: response.data.taskUUID,
-        taskType: response.data.taskType,
-        status: 'success',
-        imageURL: response.data.imageURL,
-        processingTime: response.data.processingTime,
-      };
+      console.log('Runware API response:', JSON.stringify(response.data, null, 2));
+
+      // Runware API returns results in data array
+      if (response.data?.data && response.data.data.length > 0) {
+        const result = response.data.data[0];
+        return {
+          taskUUID: result.taskUUID,
+          taskType: result.taskType,
+          status: 'success',
+          imageURL: result.imageURL,
+          processingTime: result.processingTime,
+        };
+      } else if (response.data?.errors) {
+        throw new Error(response.data.errors[0]?.message || 'Generation failed');
+      } else {
+        throw new Error('Unexpected response format');
+      }
     } catch (error) {
       console.error('Error generating image:', error);
       throw this.handleError(error);
@@ -229,13 +246,37 @@ export class RunwareAPI {
     }
   }
 
-  // Validate API key
+  // Validate API key by making a simple request
   async validateApiKey(): Promise<boolean> {
     try {
-      await this.axiosInstance.get('/auth/validate');
+      // Test the API key with a simple request
+      const testRequest = [{
+        taskType: 'imageInference',
+        taskUUID: this.generateUUID(),
+        positivePrompt: 'test',
+        width: 512,
+        height: 512,
+        model: 'runware:101@1', // FLUX.1 Dev model
+        steps: 1,
+        numberResults: 1,
+        outputType: 'URL',
+        deliveryMethod: 'sync'
+      }];
+      
+      const response = await this.axiosInstance.post('', testRequest);
+      
+      // If we get a response without authentication errors, the key is valid
+      return !response.data?.errors?.some((error: any) => 
+        error.code === 'invalidApiKey' || error.message?.includes('API key')
+      );
+    } catch (error: any) {
+      // Check if it's an authentication error
+      if (error.response?.status === 401 || 
+          error.response?.data?.errors?.some((e: any) => e.code === 'invalidApiKey')) {
+        return false;
+      }
+      // For other errors, assume the key might be valid but there's another issue
       return true;
-    } catch {
-      return false;
     }
   }
 }
